@@ -4,7 +4,8 @@ import requests
 import json
 # from bs4 import BeautifulSoup 
 from Logger import Log
-default_timeout = 100 
+default_timeout = 3
+log = Log.getLogger('MusicSpider')
 
 class NetEase:
     def __init__(self):
@@ -53,7 +54,7 @@ class NetEase:
         return datalist
 
     # 搜索单曲(1)，专辑(10)，歌手(100)
-    def search(self, s, stype=1, offset=0, total="true", limit=10):
+    def search(self, s, stype=1, offset=0, total="true", limit=1):
         action = 'http://music.163.com/api/search/get/web'
         data = {
             's': s,
@@ -75,11 +76,13 @@ class NetEase:
         except:
             return []
 
-    def httpRequest(self, method, action, query=None, urlencoded=None, callback=None, timeout=None):    
+    def httpRequest(self, method, action, query=None):    
         if(method == 'GET'):
             url = action if (query == None) else (action + '?' + query)
+            connection = requests.get(url, headers=self.header, timeout=default_timeout)
 
-            f = open("./src/proxy")
+        elif(method == 'POST'):
+            f = open("./proxy/gwproxy")
             lines = f.readlines()
             proxys = []
             for i in range(0,len(lines)):
@@ -92,20 +95,22 @@ class NetEase:
 
             for proxy in proxys:
                 try:
-                    connection = requests.get(url, headers=self.header, proxies=proxy, timeout=default_timeout)
-                    
-                except Exception,e:
-                    print proxy
-                    print e
+                    connection = requests.post(
+                        action,
+                        data=query,
+                        headers=self.header,
+                        timeout=default_timeout,
+                        proxies=proxy
+                    )
+                    print(proxy)
+                    print(connection.status_code)
+                    print(connection.text)
+                    if (connection.status_code == '200'):
+                        log.info(proxy)
+                        log.info(connection.text)
+                except Exception as e:
+                    print (e)
                     continue
-
-        elif(method == 'POST'):
-            connection = requests.post(
-                action,
-                data=query,
-                headers=self.header,
-                timeout=default_timeout
-            )
             
         connection.encoding = "utf-8"
         connection = json.loads(connection.text)
@@ -137,17 +142,14 @@ class NetEase:
 
             return temp
 
-        # elif (dig_type == 'albums'):
-
-        # elif (dig_type == 'artists'): 
-
-        # else return []
-    
+        elif (dig_type == 'albums'):
+            pass
+        elif (dig_type == 'artists'): 
+            pass
+        else:
+            pass
 ###############################################################################
 netEase = NetEase()
-log = Log.getLogger('MusicSpider')
-
-
 
 # 搜索歌曲, 专辑，歌手 
 s = "imagine"
@@ -164,7 +166,7 @@ log.info(musics)
 # for i in range(0, len(musics['result']['songs']) ):
 #     song_ids.append( musics['result']['songs'][i]['id'] )
 # songs = netEase.songs_detail(song_ids)
-
+#  
 # # 挖歌曲中的数据
 # datalist = netEase.dig_info(songs, 'songs')
 # log.info("==================datalist================")
