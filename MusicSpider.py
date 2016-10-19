@@ -1,11 +1,9 @@
-# import urllib.request
-# import re
 import requests
 import json
-# from bs4 import BeautifulSoup 
 from Logger import Log
 default_timeout = 3
 log = Log.getLogger('MusicSpider')
+
 
 class NetEase:
     def __init__(self):
@@ -21,9 +19,9 @@ class NetEase:
         }
 
     # biuld search
-    def biuld_search(self, s, stype, limit):
-        data = self.search(s, stype, limit)
-
+    def build_dig(self, s, stype, limit):
+        data = self.search(s, stype=stype, limit=limit)
+        print(data)
         dig_data = []
         dig_type = ""
 
@@ -36,22 +34,16 @@ class NetEase:
             dig_type = 'songs'
 
         elif (stype == 10):
-            # dig albums
             if 'albums' in data['result']:
                 dig_data = data['result']['albums']
                 dig_type = 'albums'
 
         elif (stype == 100):
-            # dig artists
             if 'artists' in data['result']:
                 dig_data = data['result']['artists']
                 dig_type = 'artists'
 
-        # else : return []z
-
-        # 挖数据
-        datalist = self.dig_info(dig_data, dig_type)
-        return datalist
+        return dig_data, dig_type
 
     # 搜索单曲(1)，专辑(10)，歌手(100)
     def search(self, s, stype=1, offset=0, total="true", limit=1):
@@ -64,8 +56,8 @@ class NetEase:
             'limit': limit
         }
         return self.httpRequest('POST', action, data)
-    
-    # song ids --> song urls ( details )
+
+    # song ids 拼接成 song urls 得到 details
     def songs_detail(self, ids, offset=0):
         action = 'http://music.163.com/api/song/detail?ids=[' + (',').join(map(str, ids)) + ']'
         print(action)
@@ -76,42 +68,52 @@ class NetEase:
         except:
             return []
 
-    def httpRequest(self, method, action, query=None):    
+    # HTTP 请求
+    def httpRequest(self, method, action, query=None):
         if(method == 'GET'):
+            print('get 请求')
             url = action if (query == None) else (action + '?' + query)
             connection = requests.get(url, headers=self.header, timeout=default_timeout)
 
         elif(method == 'POST'):
-            f = open("./proxy/gwproxy")
-            lines = f.readlines()
-            proxys = []
-            for i in range(0,len(lines)):
-                ip = lines[i].strip("\n").split("\t")
-                proxy_host = "http://"+ip[0]+":"+ip[1]
-                # print proxy_host
-                proxy_temp = {"http":proxy_host}
-                # print proxy_temp
-                proxys.append(proxy_temp)
+            print('post 请求')
+            # f = open("./proxy/gnproxy")
+            # lines = f.readlines()
+            # proxys = []
+            # for i in range(0,len(lines)):
+            #     ip = lines[i].strip("\n").split("\t")
+            #     proxy_host = "http://"+ip[0]+":"+ip[1]
+            #     # print proxy_host
+            #     proxy_temp = {"http":proxy_host}
+            #     # print proxy_temp
+            #     proxys.append(proxy_temp)
+            #
+            # for proxy in proxys:
+            #     try:
+            #         connection = requests.post(
+            #             action,
+            #             data=query,
+            #             headers=self.header,
+            #             timeout=default_timeout,
+            #             proxies=proxy
+            #         )
+            #         log.info(proxy)
+            #         log.info(connection.status_code)
+            #         if (connection.status_code == 200):
+            #             break
+            #     except Exception as e:
+            #         print (e)
+            #         continue
 
-            for proxy in proxys:
-                try:
-                    connection = requests.post(
-                        action,
-                        data=query,
-                        headers=self.header,
-                        timeout=default_timeout,
-                        proxies=proxy
-                    )
-                    print(proxy)
-                    print(connection.status_code)
-                    print(connection.text)
-                    if (connection.status_code == '200'):
-                        log.info(proxy)
-                        log.info(connection.text)
-                except Exception as e:
-                    print (e)
-                    continue
-            
+            connection = requests.post(
+                action,
+                data=query,
+                headers=self.header,
+                timeout=default_timeout,
+            )
+
+        log.info(connection.status_code)
+
         connection.encoding = "utf-8"
         connection = json.loads(connection.text)
         return connection
@@ -121,6 +123,7 @@ class NetEase:
         temp = []
         
         if (dig_type == 'songs'):
+            print('搜索歌曲')
             for i in range(0, len(dig_data) ):
                 song_info = {
                     'song_id': dig_data[i]['id'],
@@ -140,34 +143,25 @@ class NetEase:
 
                 temp.append(song_info)
 
-            return temp
-
         elif (dig_type == 'albums'):
-            pass
-        elif (dig_type == 'artists'): 
-            pass
-        else:
-            pass
-###############################################################################
-netEase = NetEase()
+            print('搜索专辑')
+            for i in range(0, len(dig_data)):
+                album_info = {
+                    'album_id': dig_data[i]['id'],
+                    'album_name': dig_data[i]['name'],
+                    'artist_name': dig_data[i]['artist']['name'],
+                }
 
-# 搜索歌曲, 专辑，歌手 
-s = "imagine"
-stype = 1
-limit = 10
-musics = netEase.search(s, stype, limit)
-log.info("==================musics================")
-log.info(musics)
+                temp.append(album_info)
 
-# 通过 ids 获得歌曲 songs 详细
+        elif (dig_type == 'artists'):
+            print('搜索艺术家')
+            for i in range(0, len(dig_data)):
+                artist_info = {
+                    'artist_id': dig_data[i]['id'],
+                    'artist_name': dig_data[i]['name'],
+                }
 
+                temp.append(artist_info)
 
-# song_ids = []
-# for i in range(0, len(musics['result']['songs']) ):
-#     song_ids.append( musics['result']['songs'][i]['id'] )
-# songs = netEase.songs_detail(song_ids)
-#  
-# # 挖歌曲中的数据
-# datalist = netEase.dig_info(songs, 'songs')
-# log.info("==================datalist================")
-# log.info(datalist)
+        return temp
